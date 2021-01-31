@@ -1,0 +1,235 @@
+---
+title: "Reproducible Research - Week 2: Course Project 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Load and preprocess the data
+
+1. Load the data
+```{r, message=FALSE, warning=FALSE}
+## loads packages
+library(dplyr)
+library(lattice)
+```
+
+
+```{r, results='hide'}
+##  data file is stored in the working directory
+steps <- read.csv("activity.csv")
+
+```
+
+
+```{r }
+## view properties of dataset
+str(steps)
+```
+
+2. Transform the data 
+```{r }
+## converts date variable to date class
+steps$date <- as.Date(steps$date, "%Y-%m-%d")
+```
+
+
+## What is mean total number of steps taken per day?
+
+For this part of the assignment, the missing values in the dataset are ignored.
+
+1. Calculate the total number of steps taken per day
+```{r, message=FALSE}
+## uses dplr package to calculate and summarize total daily steps
+stepsdailytotal <-
+  steps %>% 
+  group_by(date) %>%        
+  summarize(total= sum(steps, na.rm = TRUE))
+
+head(stepsdailytotal)
+
+```
+
+
+2. Make a histogram of the total number of steps taken each day
+```{r}
+## histogram of total steps per day 
+hist(stepsdailytotal$total,
+     xlab = "Steps",
+     main = "Total Steps per Day")
+```
+
+3. The mean and median of the total number of steps taken per day
+
+```{r}
+paste("Mean is ", round(mean(stepsdailytotal$total, na.rm = TRUE), 0)) 
+paste("Median is ", round(median(stepsdailytotal$total, na.rm = TRUE), 0)) 
+```
+
+
+## What is the average daily activity pattern?
+
+1. A time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis).
+
+```{r, message=FALSE}
+## calculates averages
+pattern <-
+  steps %>% 
+  group_by(interval) %>%        
+  summarize(avg= mean(steps, na.rm = TRUE))
+```
+
+
+```{r, message=FALSE,warning=FALSE}
+head(pattern)
+```
+
+
+```{r}
+## plots averages
+plot(pattern$interval,
+     pattern$avg, 
+     type="l", 
+     ylab = "Average steps",
+     xlab = "Interval",
+     main = "Daily Activity Pattern" )
+```
+
+2. The 5-minute interval, on average across all the days in the dataset, that contains the maximum number of steps.
+
+```{r}
+
+paste("Interval ", 
+      pattern$interval[pattern$avg==max(pattern$avg)], 
+      " contains the maximum number of steps") 
+
+```
+
+## Imputing missing values
+
+1. The total number of missing values in the dataset (i.e. the total number of rows with \color{red}{\verb|NA|}NAs) is 2304.
+
+```{r}
+colSums(is.na(steps))
+```
+
+2. Strategy for filling in all of the missing values in the dataset is to impute the mean for that 5-minute interval.
+
+Subset missing values
+
+```{r}
+## subsets rows with missing steps value
+missing <- is.na(steps$steps)
+missingsubset <- steps[missing,]
+```
+
+
+```{r}
+## confirms only NAs are subsetted
+head(missingsubset)
+tail(missingsubset)
+```
+
+
+Replace missing values with interval average
+
+```{r}
+## replaces missing values with  average calculated in Section 3 
+for (i in 1:length(missingsubset$steps))  {
+  missingsubset[i,1] <- pattern$avg[pattern$interval==missingsubset$interval[i]]
+  }
+```
+
+
+```{r}
+str(missingsubset)
+```
+
+
+```{r}
+## confirms no missing data in subset
+colSums(is.na(missingsubset))
+```
+
+3. Creates a new dataset that is equal to the original dataset but with the missing data filled in
+
+```{r}
+## creates copy of original dataset and inserts missing values
+stepsimputed <- steps
+stepsimputed[missing,] <- missingsubset
+```
+
+
+```{r}
+## confirms no missing values
+colSums(is.na(stepsimputed))
+```
+
+4. Histogram of the total number of steps taken each day
+
+```{r, warning=FALSE, message=FALSE}
+## recalculates daily total with imputed missing values 
+
+stepsfilled <-
+  stepsimputed %>% 
+  group_by(date) %>%        
+  summarize(total= sum(steps, na.rm = TRUE))
+```
+
+
+```{r, warning=FALSE}
+## plots data with imputed values included
+hist(stepsfilled$total, 
+     xlab = "Steps",
+     main = "Total Steps per Day")
+```
+
+The mean and median total number of steps taken per day
+
+
+```{r}
+paste("Mean is ", round(mean(stepsfilled$total), 0)) 
+
+paste("Median is ", round(median(stepsfilled$total),0)) 
+```
+
+
+Median and mean are now identical and both values are higher than the previous estimates. 
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+Dataset with the filled-in missing values is used for this part.
+
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r}
+
+stepsimputed$day <- weekdays(steps$date)
+stepsimputed$dayfac <- "Weekday"
+weekendInd <- which(stepsimputed$day=="Saturday" |  stepsimputed$day =="Sunday")
+stepsimputed$dayfac[weekendInd] <- "Weekend"
+```
+
+Panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+
+```{r, warning=FALSE, message=FALSE}
+stepsdays <-
+  stepsimputed %>% 
+  group_by(dayfac, interval) %>% 
+  summarize(avg= mean(steps, na.rm = TRUE))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+xyplot(avg ~ interval | dayfac, 
+       data = stepsdays, 
+       layout = c(1, 2),
+       type="l")
+```
+
+
